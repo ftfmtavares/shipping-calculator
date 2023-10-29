@@ -10,14 +10,21 @@ import (
 
 func main() {
 	port := flag.Int("port", 80, "Server Port")
+	databaseFile := flag.String("db", "products.db", "Sqlite DB file")
 	flag.Parse()
 	if *port < 0 {
+		fmt.Println("Invalid Port")
 		flag.PrintDefaults()
 		return
 	}
 
-	productsDB := database.NewProducts()
-	srv := server.NewServer(*port, productsDB)
-	err := srv.ListenAndServe()
+	db, err := database.NewDatabase(*databaseFile)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+
+	srv := server.NewServer(*port, db)
+	err = srv.ListenAndServe()
 	fmt.Println(err.Error())
 }

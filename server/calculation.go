@@ -26,9 +26,13 @@ func calculateShipping(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	packSizes, err := productsDB.GetPackSizes(productID)
+	packSizes, err := productsTable.GetPackSizes(productID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	if len(packSizes) == 0 {
+		http.Error(w, "product doesn't have any defined pack sizes", http.StatusNotFound)
 		return
 	}
 

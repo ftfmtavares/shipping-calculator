@@ -1,86 +1,146 @@
 package database
 
 import (
-	"fmt"
-	"sort"
+	"database/sql"
+	"errors"
 )
 
-var defaultPackSizes = []int{
-	250,
-	500,
-	1000,
-	2000,
-	5000,
+const (
+	selectProduct = `
+	/*name:select_product*/
+	SELECT p.id FROM products p
+	WHERE p.id = ?;
+	`
+
+	selectProductPackSize = `
+	/*name:select_product_pack_size*/
+	SELECT ps.pid, ps.size FROM packsizes ps
+	WHERE ps.pid = ? AND ps.size = ?;
+	`
+
+	selectProductPackSizes = `
+	/*name:select_product_pack_sizes*/
+	SELECT ps.size FROM packsizes ps
+	WHERE ps.pid = ?
+	ORDER BY ps.size;
+	`
+
+	insertProductPackSizes = `
+	/*name:insert_product_pack_sizes*/
+	INSERT INTO packsizes
+	VALUES (?,?);
+	`
+
+	deleteProductPackSizes = `
+	/*name:delete_product_pack_sizes*/
+	DELETE FROM packsizes
+	WHERE pid = ? AND size = ?;
+	`
+)
+
+var (
+	ErrProductNotFound       = errors.New("product not found")
+	ErrPackSizeAlreadyExists = errors.New("product pack size already exists")
+	ErrPackSizeNotFound      = errors.New("product pack size not found")
+)
+
+type ProductsTable struct {
+	db *sql.DB
 }
 
-type Product struct {
-	ID        int
-	PackSizes []int
-}
-
-type Products struct {
-	products map[int]Product
-}
-
-func NewProducts() Products {
-	return Products{
-		products: map[int]Product{
-			1: {
-				ID:        1,
-				PackSizes: defaultPackSizes,
-			},
-		},
+func NewProductsTable(db *sql.DB) ProductsTable {
+	return ProductsTable{
+		db: db,
 	}
 }
 
-func (p Products) GetPackSizes(productID int) (empty []int, err error) {
-	_, exists := p.products[productID]
-	if !exists {
-		return empty, fmt.Errorf("product not found")
-	}
-	return p.products[productID].PackSizes, nil
+func (p ProductsTable) checkProduct(productID int) error {
+	row := p.db.QueryRow(selectProduct, productID)
+	var pid int
+	return row.Scan(&pid)
 }
 
-func (p *Products) AddPackSize(productID int, size int) (err error) {
-	_, exists := p.products[productID]
-	if !exists {
-		return fmt.Errorf("product not found")
-	}
+func (p ProductsTable) checkProductPackSize(productID int, size int) error {
+	row := p.db.QueryRow(selectProductPackSize, productID, size)
+	var pid int
+	var psize int
+	return row.Scan(&pid, &psize)
+}
 
-	for _, packSize := range p.products[productID].PackSizes {
-		if packSize == size {
-			return fmt.Errorf("product already has that pack size")
+func (p ProductsTable) GetPackSizes(productID int) ([]int, error) {
+	err := p.checkProduct(productID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrProductNotFound
 		}
+
+		return nil, err
 	}
 
-	newPackSizes := append(p.products[productID].PackSizes, size)
-	sort.Slice(newPackSizes, func(i, j int) bool {
-		return newPackSizes[i] < newPackSizes[j]
-	})
-	p.products[productID] = Product{
-		ID:        productID,
-		PackSizes: newPackSizes,
+	rows, err := p.db.Query(selectProductPackSizes, productID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make([]int, 0)
+	for rows.Next() {
+		var size int
+		err = rows.Scan(&size)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, size)
+	}
+	err = rows.Err()
+	if err != nil {
+		return nil, err
 	}
 
-	return nil
+	return result, nil
 }
 
-func (p *Products) DeletePackSize(productID int, size int) (err error) {
-	_, exists := p.products[productID]
-	if !exists {
-		return fmt.Errorf("product not found")
-	}
-
-	for i, packSize := range p.products[productID].PackSizes {
-		if packSize == size {
-			newPackSizes := append(p.products[productID].PackSizes[:i], p.products[productID].PackSizes[i+1:]...)
-			p.products[productID] = Product{
-				ID:        productID,
-				PackSizes: newPackSizes,
-			}
-			return nil
+func (p ProductsTable) AddPackSize(productID int, size int) error {
+	err := p.checkProduct(productID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return ErrProductNotFound
 		}
+
+		return err
 	}
 
-	return fmt.Errorf("product doesn't have that pack size")
+	err = p.checkProductPackSize(productID, size)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+	if err == nil {
+		return ErrPackSizeAlreadyExists
+	}
+
+	_, err = p.db.Exec(insertProductPackSizes, productID, size)
+	return err
+}
+
+func (p ProductsTable) DeletePackSize(productID int, size int) error {
+	err := p.checkProduct(productID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return ErrProductNotFound
+		}
+
+		return err
+	}
+
+	err = p.checkProductPackSize(productID, size)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return ErrPackSizeNotFound
+		}
+
+		return err
+	}
+
+	_, err = p.db.Exec(deleteProductPackSizes, productID, size)
+	return err
 }

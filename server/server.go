@@ -9,10 +9,10 @@ import (
 	"github.com/gorilla/mux"
 )
 
-var productsDB database.Products
+var productsTable database.ProductsTable
 
-func NewServer(port int, products database.Products) http.Server {
-	productsDB = products
+func NewServer(port int, database database.Database) http.Server {
+	productsTable = database.Products
 
 	router := mux.NewRouter()
 
@@ -24,7 +24,7 @@ func NewServer(port int, products database.Products) http.Server {
 	return http.Server{
 		Handler:      router,
 		Addr:         fmt.Sprintf(":%d", port),
-		WriteTimeout: 5 * time.Second,
-		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		ReadTimeout:  10 * time.Second,
 	}
 }

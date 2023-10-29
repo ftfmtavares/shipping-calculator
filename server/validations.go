@@ -8,7 +8,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-const maxOrder = 100000000
+const maxOrder = 10000000
 
 func validatePidVar(w http.ResponseWriter, r *http.Request) (int, bool) {
 	pidVar := mux.Vars(r)["pid"]

@@ -15,7 +15,7 @@ func listPackSizes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	packSizes, err := productsDB.GetPackSizes(productID)
+	packSizes, err := productsTable.GetPackSizes(productID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -40,13 +40,13 @@ func addPackSize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := productsDB.AddPackSize(productID, size)
+	err := productsTable.AddPackSize(productID, size)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusCreated)
 }
 
 func deletePackSize(w http.ResponseWriter, r *http.Request) {
@@ -60,11 +60,11 @@ func deletePackSize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := productsDB.DeletePackSize(productID, size)
+	err := productsTable.DeletePackSize(productID, size)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusNoContent)
 }
